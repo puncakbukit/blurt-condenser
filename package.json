@@ -11,6 +11,7 @@
     "scripts": {
         "prebuild": "mkdir tmp || true",
         "build": "NODE_ENV=production webpack --config ./webpack/prod.config.js && rm -rf ./lib && babel src --out-dir lib -D",
+        "build:prod": "npm run build",
         "eslint": "LIST=`git diff-index --name-only HEAD | grep .*\\.js | grep -v json`; if [ \"$LIST\" ]; then eslint $LIST; fi",
         "ci:test": "jest --coverage",
         "ci:eslint": "eslint src/",
@@ -21,9 +22,7 @@
         "debug": "NODE_ENV=development webpack --config ./webpack/debug.config.js && rm -rf ./lib && babel src --source-maps --out-dir lib -D && node --inspect-brk lib/server/index.js",
         "checktranslations": "node scripts/check_translations.js",
         "storybook": "start-storybook -p 9001 -c .storybook",
-        "storybook-build": "build-storybook -c .storybook -o docs",
-        "predeploy": "npm run build",
-        "deploy": "gh-pages -d dist"
+        "storybook-build": "build-storybook -c .storybook -o docs"
     },
     "author": "Blurt",
     "license": "MIT",
