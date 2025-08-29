@@ -1,23 +1,26 @@
-name: Deploy to GitHub Pages
-
-on:
-  push:
-    branches:
-      - main
-
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci   # or "npm install" if you don't use lockfile
+
+      - name: Build project
         run: npm run build
 
-      - name: Copy index.html to 404.html
+      - name: Copy 404.html
         run: cp dist/index.html dist/404.html
 
-      - name: Deploy
+      - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
