@@ -1,24 +1,28 @@
+
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 const webpack = require('webpack');
 const baseConfig = require('./base.config');
+const path = require('path');
 
 module.exports = {
-    ...baseConfig,
-    plugins: [
-        new webpack.DefinePlugin({
-            'process.env': {
-                BROWSER: JSON.stringify(true),
-                NODE_ENV: JSON.stringify('production'),
-            },
-        }),
-        ...baseConfig.plugins,
-        // Fix window.onerror
-        // See https://github.com/webpack/webpack/issues/5681#issuecomment-345861733
-        new webpack.SourceMapDevToolPlugin({
-            module: true,
-            columns: false,
-            moduleFilenameTemplate: (info) => {
-                return `${info.resourcePath}?${info.loaders}`;
-            },
-        }),
-    ],
+  ...baseConfig,
+  output: {
+    path: path.resolve(__dirname, '../dist'),
+    filename: '[name].[contenthash].js',
+    publicPath: './', // ✅ important for GitHub Pages
+  },
+  plugins: [
+    new webpack.DefinePlugin({
+      'process.env': {
+        BROWSER: JSON.stringify(true),
+        NODE_ENV: JSON.stringify('production'),
+      },
+    }),
+    ...baseConfig.plugins,
+    new HtmlWebpackPlugin({
+      template: './src/index.html', // you’ll need to create this
+      filename: 'index.html',
+    }),
+  ],
 };
+

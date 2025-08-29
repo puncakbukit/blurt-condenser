@@ -1,11 +1,11 @@
 {
   "javascript": {
-    "app": "/assets/app.85749381380584f9472c.js",
-    "vendor": "/assets/vendor.85749381380584f9472c.js",
-    "vendors~IntlBundle": "/assets/2.85749381380584f9472c.js"
+    "app": "./app.e70e6702e4dacd6ef701.js",
+    "vendor": "./vendor.20cf0f3ffbcf472ccb9c.js",
+    "vendors~IntlBundle": "./vendors~IntlBundle.4914ee09c9c3b9343dba.js"
   },
   "styles": {
-    "app": "/assets/app.css"
+    "app": "./app.css"
   },
   "assets": {
     "./src/app/assets/images/blurtgirlsplash.png": "export default __webpack_public_path__ + \"bc911434db93215fcaaf0bbb6da2d25d.png\";",
