@@ -3,7 +3,7 @@ name: Deploy SPA to GitHub Pages
 on:
   push:
     branches:
-      - main   # 👈 change if your default branch is not `main`
+      - main  # Change if default branch is not `main`
 
 jobs:
   build-deploy:
@@ -24,12 +24,16 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Copy index.html to 404.html for SPA routing
+      - name: Ensure SPA routing
         run: cp dist/index.html dist/404.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_branch: gh-pages  # ensure this is correct
+          publish_dir: dist
+          user_name: 'GitHub Actions'
+          user_email: 'actions@github.com'
+          keep_files: false         # overwrite everything in gh-pages
 
