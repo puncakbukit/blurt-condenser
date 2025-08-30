@@ -19,7 +19,12 @@ function initReducer(reducer, type) {
                 state = fromJS(state);
             }
             if (type === 'global') {
-                const content = state.get('content').withMutations((c) => {
+                // ✅ ensure content always exists as an Immutable.Map
+                let content = state.get('content');
+                if (!content) {
+                    content = Map();
+                }
+                content = content.withMutations((c) => {
                     c.forEach((cc, key) => {
                         if (!c.getIn([key, 'stats'])) {
                             // This may have already been set in UniversalRender; if so, then
@@ -48,8 +53,9 @@ export default combineReducers({
     offchain: initReducer(offchainReducer),
     user: initReducer(userReducer),
     transaction: initReducer(transactionReducer),
-    discussion: initReducer((state = {}) => state),
+    discussion: initReducer((state = Map()) => state), // ✅ ensure Map default
     routing: initReducer(routerReducer),
     app: initReducer(appReducer),
     form: formReducer,
 });
+
