@@ -1,7 +1,5 @@
 import React from 'react';
-import logo from '../../../assets/images/logo.png'; // relative to js file or use alias
-
-<img src={logo} alt="Logo" />
+import logo from 'app/assets/images/logo.png'; // relative to js file or use alias
 
 const BlurtLogo = () => {
     return (

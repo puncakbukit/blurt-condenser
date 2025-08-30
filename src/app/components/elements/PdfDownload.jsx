@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { PrivateKey } from '@blurtfoundation/blurtjs/lib/auth/ecc';
 import QRious from 'qrious';
+import logo from 'app/assets/images/pdf-logo.svg';
 
 function image2canvas(image, bgcolor) {
     const canvas = document.createElement('canvas');
@@ -84,7 +85,7 @@ export default class PdfDownload extends Component {
         return (
             <div className="pdf-download">
                 <img
-                    src="/images/pdf-logo.svg"
+                    src={logo}
                     style={{ display: 'none' }}
                     className="pdf-logo"
                 />
