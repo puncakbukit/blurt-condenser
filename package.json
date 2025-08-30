@@ -236,7 +236,7 @@
         "redux-devtools-extension": "2.13.5",
         "redux-mock-store": "1.5.1",
         "regenerator-runtime": "0.11.1",
-        "sass": "^1.30.0",
+        "sass": "1.30.0",
         "sass-loader": "^10.0.5",
         "shelljs": "^0.8.4",
         "sinon": "1.17.7",
@@ -250,7 +250,7 @@
         "node": ">=16",
         "yarn": ">=1.21"
     },
-   "resolutions": {
-     "immutable": "3.8.2"
-   }
+    "resolutions": {
+        "immutable": "3.8.2"
+    }
 }
