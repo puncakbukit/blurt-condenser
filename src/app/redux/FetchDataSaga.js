@@ -85,10 +85,10 @@ export function* fetchState(location_change_action) {
         }
 
         if (discussions && discussions.length) {
-            state.discussion_idx[page] = { '', discussions: [] };
+            state.discussion_idx[page] = { '': [] };
             for (let d of discussions) {
                 state.content[`${d.author}/${d.permlink}`] = d;
-                state.discussion_idx[page].discussions.push(`${d.author}/${d.permlink}`);
+                state.discussion_idx[page][''].push(`${d.author}/${d.permlink}`);
             }
         }
 

@@ -23,8 +23,7 @@
         "checktranslations": "node scripts/check_translations.js",
         "storybook": "start-storybook -p 9001 -c .storybook",
         "storybook-build": "build-storybook -c .storybook -o docs",
-         "postinstall": "npx npm-force-resolutions"
-
+        "postinstall": "npx npm-force-resolutions"
     },
     "author": "Blurt",
     "license": "MIT",
@@ -195,6 +194,7 @@
         "@babel/plugin-transform-runtime": "^7.13.10",
         "@babel/preset-env": "^7.13.10",
         "@babel/preset-react": "^7.12.13",
+        "ajv-keywords": "^5.1.0",
         "babel-core": "^7.0.0-bridge.0",
         "babel-eslint": "10.1.0",
         "babel-jest": "22.0.6",

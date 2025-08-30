@@ -78,10 +78,10 @@ export function* getState({ payload: { url } }) {
 
         // Fill state.content + index with posts
         if (discussions && discussions.length) {
-            state.discussion_idx[url] = { '', discussions: [] };
+            state.discussion_idx[page] = { '': [] };
             for (let d of discussions) {
                 state.content[`${d.author}/${d.permlink}`] = d;
-                state.discussion_idx[url].discussions.push(`${d.author}/${d.permlink}`);
+                state.discussion_idx[page][''].push(`${d.author}/${d.permlink}`);
             }
         }
 
