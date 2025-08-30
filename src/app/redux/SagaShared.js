@@ -52,6 +52,16 @@ export function* getAccount(username, force = false) {
     }
     return account;
 }
+// Patch start
+function safePutReceiveState(state) {
+    if (globalActions && typeof globalActions.receiveState === 'function') {
+        return put(globalActions.receiveState(state));
+    } else {
+        console.warn('globalActions.receiveState is missing or not a function', globalActions);
+        return null; // no-op
+    }
+}
+// Patch end
 
 /** Manual refreshes.  The router is in FetchDataSaga. */
 export function* getState({ payload: { url } }) {
@@ -84,8 +94,7 @@ export function* getState({ payload: { url } }) {
                 state.discussion_idx[page][''].push(`${d.author}/${d.permlink}`);
             }
         }
-
-        yield put(globalActions.receiveState(state));
+        yield safePutReceiveState(state);
     } catch (error) {
         console.error('~~ Saga getState error ~~>', url, error);
         yield put(appActions.steemApiError(error.message));

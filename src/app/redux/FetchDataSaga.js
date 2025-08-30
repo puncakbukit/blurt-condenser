@@ -14,7 +14,16 @@ import * as appActions from './AppReducer';
 import constants from './constants';
 import { fromJS, Map, Set } from 'immutable';
 import { getStateAsync, callNotificationsApi } from 'app/utils/steemApi';
-
+// --- PATCH: safe wrapper ---
+function safePutReceiveState(state) {
+    if (globalActions && typeof globalActions.receiveState === 'function') {
+        return put(globalActions.receiveState(state));
+    } else {
+        console.warn('globalActions.receiveState is missing or not a function', globalActions);
+        return null; // no-op
+    }
+}
+// ----------------------------
 const REQUEST_DATA = 'fetchDataSaga/REQUEST_DATA';
 const GET_CONTENT = 'fetchDataSaga/GET_CONTENT';
 const FETCH_STATE = 'fetchDataSaga/FETCH_STATE';
@@ -92,7 +101,9 @@ export function* fetchState(location_change_action) {
             }
         }
 
-        yield put(globalActions.receiveState(state));
+        // --- PATCH: safe wrapper ---
+        yield safePutReceiveState(state);
+        // ---------------------------- 
         yield call(syncSpecialPosts);
     } catch (error) {
         console.error('~~ Saga fetchState error ~~>', url, error);
