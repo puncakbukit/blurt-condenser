@@ -47,26 +47,51 @@ export function* fetchState(location_change_action) {
         yield fork(loadFollows, 'getFollowingAsync', username, 'blog');
     }
 
-    // `ignore_fetch` case should only trigger on initial page load. No need to call
-    // fetchState immediately after loading fresh state from the server. Details: #593
     const server_location = yield select((state) =>
         state.offchain.get('server_location')
     );
     const ignore_fetch = pathname === server_location && is_initial_state;
 
-    if (ignore_fetch) {
-        return;
-    }
+    if (ignore_fetch) return;
     is_initial_state = false;
+
     if (process.env.BROWSER && window && window.optimize) {
         console.log('REFRESH ADS');
         window.optimize.refreshAll({ refresh: false });
     }
+
     const url = pathname;
 
     yield put(appActions.fetchDataBegin());
     try {
-        const state = yield call(getStateAsync, url);
+        // Fallback instead of getStateAsync
+        let state = {
+            content: {},
+            accounts: {},
+            discussion_idx: {},
+        };
+
+        // Normalize url
+        let page = url.split('?')[0].replace(/^\/+|\/+$/g, '');
+        if (page === '') page = 'hot';
+
+        let discussions = [];
+        if (page.startsWith('trending') || page === 'trending') {
+            discussions = yield call([api, api.getDiscussionsByTrendingAsync], { tag: '', limit: 20 });
+        } else if (page.startsWith('hot') || page === 'hot') {
+            discussions = yield call([api, api.getDiscussionsByHotAsync], { tag: '', limit: 20 });
+        } else if (page.startsWith('created') || page === 'created') {
+            discussions = yield call([api, api.getDiscussionsByCreatedAsync], { tag: '', limit: 20 });
+        }
+
+        if (discussions && discussions.length) {
+            state.discussion_idx[page] = { '', discussions: [] };
+            for (let d of discussions) {
+                state.content[`${d.author}/${d.permlink}`] = d;
+                state.discussion_idx[page].discussions.push(`${d.author}/${d.permlink}`);
+            }
+        }
+
         yield put(globalActions.receiveState(state));
         yield call(syncSpecialPosts);
     } catch (error) {

@@ -56,7 +56,35 @@ export function* getAccount(username, force = false) {
 /** Manual refreshes.  The router is in FetchDataSaga. */
 export function* getState({ payload: { url } }) {
     try {
-        const state = yield call(getStateAsync, url);
+        // Instead of calling broken get_state, build a minimal state
+        let state = {
+            content: {},
+            accounts: {},
+            discussion_idx: {},
+        };
+
+        // Normalize the url
+        url = url.split('?')[0].replace(/^\/+|\/+$/g, '');
+        if (url === '') url = 'hot';
+
+        let discussions = [];
+        if (url.startsWith('trending') || url === 'trending') {
+            discussions = yield call([api, api.getDiscussionsByTrendingAsync], { tag: '', limit: 20 });
+        } else if (url.startsWith('hot') || url === 'hot') {
+            discussions = yield call([api, api.getDiscussionsByHotAsync], { tag: '', limit: 20 });
+        } else if (url.startsWith('created') || url === 'created') {
+            discussions = yield call([api, api.getDiscussionsByCreatedAsync], { tag: '', limit: 20 });
+        }
+
+        // Fill state.content + index with posts
+        if (discussions && discussions.length) {
+            state.discussion_idx[url] = { '', discussions: [] };
+            for (let d of discussions) {
+                state.content[`${d.author}/${d.permlink}`] = d;
+                state.discussion_idx[url].discussions.push(`${d.author}/${d.permlink}`);
+            }
+        }
+
         yield put(globalActions.receiveState(state));
     } catch (error) {
         console.error('~~ Saga getState error ~~>', url, error);
