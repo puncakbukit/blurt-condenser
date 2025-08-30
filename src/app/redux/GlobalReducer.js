@@ -321,8 +321,23 @@ export default function reducer(state = defaultState, action = {}) {
             );
         }
 
+        case RECEIVE_STATE: {
+            const payload = fromJS(action.payload);
+            return state.mergeDeep(payload);
+        }
+
         default:
             return state;
     }
+}
+// Action type
+export const RECEIVE_STATE = 'global/RECEIVE_STATE';
+
+// Action creator
+export function receiveState(payload) {
+    return {
+        type: RECEIVE_STATE,
+        payload,
+    };
 }
 
