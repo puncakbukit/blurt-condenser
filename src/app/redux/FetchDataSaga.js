@@ -57,7 +57,7 @@ export function* fetchState(location_change_action) {
     }
 
     const server_location = yield select((state) =>
-        state.offchain.get('server_location')
+        state.offchain ? state.offchain.get('server_location') : null
     );
     const ignore_fetch = pathname === server_location && is_initial_state;
 
@@ -119,9 +119,9 @@ function* syncSpecialPosts() {
 
     // Get special posts from the store.
     const specialPosts = yield select((state) =>
-        state.offchain.get('special_posts')
+        state.offchain ? state.offchain.get('special_posts') : null
     );
-
+    if (!specialPosts) return null;
     // Mark seen featured posts.
     const seenFeaturedPosts = specialPosts.get('featured_posts').map((post) => {
         const id = `${post.get('author')}/${post.get('permlink')}`;
