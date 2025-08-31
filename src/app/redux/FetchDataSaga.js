@@ -13,8 +13,7 @@ import { getContent } from 'app/redux/SagaShared';
 import * as globalActions from './GlobalReducer';
 import * as appActions from './AppReducer';
 import constants from './constants';
-import { fromJS, Map, Set } from 'immutable';
-// NOTE: removed getStateAsync (was unused)
+import { fromJS } from 'immutable';
 import { callNotificationsApi } from 'app/utils/steemApi';
 
 // --- PATCH: safe wrapper for receiveState ---
@@ -46,58 +45,26 @@ export const fetchDataWatches = [
 ];
 
 export function* getContentCaller(action) {
+    const { author, permlink } = action.payload;
+    // PATCH: skip .html or invalid content requests
+    if (!author || !permlink || permlink.endsWith('.html')) {
+        console.warn('Skipping getContentCaller for non-post', { author, permlink });
+        if (action.payload.reject) action.payload.reject();
+        return;
+    }
     yield getContent(action.payload);
 }
 
 let is_initial_state = true;
 export function* fetchState(location_change_action) {
-    const { pathname: rawPathname } = location_change_action.payload;
+    const { pathname } = location_change_action.payload;
 
-    // --- Normalize pathname for static / GitHub Pages hosts ---
-    // Convert things like:
-    //   /blurt-condenser/index.html  -> /
-    //   /blurt-condenser/            -> /
-    //   /index.html                  -> /
-    // Also strip any leading/trailing slashes to form page key below.
-    let pathname = rawPathname || '/';
-    try {
-        // Remove query/fragment if any (shouldn't be present here, but be defensive)
-        pathname = pathname.split('?')[0].split('#')[0];
-
-        // If the repo name is included as prefix (common on GitHub Pages),
-        // remove it. We attempt to read from <base href="..."> if available in browser,
-        // otherwise fall back to removing a common repo prefix like '/blurt-condenser'.
-        if (process.env.BROWSER && typeof document !== 'undefined') {
-            const base = document.querySelector('base');
-            if (base && base.getAttribute('href')) {
-                const baseHref = base.getAttribute('href');
-                if (baseHref !== '/' && pathname.startsWith(baseHref)) {
-                    pathname = pathname.substr(baseHref.length - (baseHref.endsWith('/') ? 1 : 0));
-                    if (!pathname.startsWith('/')) pathname = '/' + pathname;
-                }
-            } else {
-                // heuristic: remove common repo folder if present
-                const repoPrefixMatch = pathname.match(/^\/([a-z0-9\-_]+)(\/|$)/i);
-                // if match and path contains 'index.html' assume it's the repo file path -> strip first segment
-                if (repoPrefixMatch && pathname.endsWith('index.html')) {
-                    pathname = pathname.replace(/^\/[^/]+/, '') || '/';
-                }
-            }
-        } else {
-            // Non-browser (server) - also strip any trailing index.html to avoid server treating it like content.
-            if (pathname.endsWith('index.html')) pathname = pathname.replace(/index\.html$/, '');
-        }
-
-        // Final tiny normalization: collapse multiple slashes, ensure at least '/'
-        pathname = pathname.replace(/\/+/g, '/');
-        if (pathname === '' || pathname === '/') pathname = '/';
-    } catch (e) {
-        // On any unexpected error, fall back to rawPathname
-        pathname = rawPathname || '/';
+    // PATCH: skip .html pages entirely
+    if (pathname.endsWith('.html')) {
+        console.warn('Skipping fetchState for .html page:', pathname);
+        return;
     }
-    // --- end normalization ---
 
-    // Extract username if route like /@username
     const m = pathname.match(/^\/@([a-z0-9\.-]+)/);
     if (m && m.length === 2) {
         const username = m[1];
@@ -110,13 +77,10 @@ export function* fetchState(location_change_action) {
         state.offchain ? state.offchain.get('server_location') : null
     );
 
-    // --- PATCH: Always fetch on pure client-side (SPA) builds ---
     let ignore_fetch = false;
     if (!process.env.BROWSER) {
-        // only skip on server-side render
         ignore_fetch = pathname === server_location && is_initial_state;
     }
-
     if (ignore_fetch) return;
     is_initial_state = false;
 
@@ -129,17 +93,14 @@ export function* fetchState(location_change_action) {
 
     yield put(appActions.fetchDataBegin());
     try {
-        // Client-side fallback initial state builder (no getStateAsync)
         let state = {
             content: {},
             accounts: {},
             discussion_idx: {},
         };
 
-        // Normalize url to a page key
         let page = url.split('?')[0].replace(/^\/+|\/+$/g, '');
-        // If page is something like 'index.html' or contains '.html' treat as home
-        if (page === '' || page === 'index.html' || /\.html$/i.test(page)) page = 'hot';
+        if (page === '') page = 'hot';
 
         let discussions = [];
         if (page.startsWith('trending') || page === 'trending') {
@@ -148,10 +109,6 @@ export function* fetchState(location_change_action) {
             discussions = yield call([api, api.getDiscussionsByHotAsync], { tag: '', limit: 20 });
         } else if (page.startsWith('created') || page === 'created') {
             discussions = yield call([api, api.getDiscussionsByCreatedAsync], { tag: '', limit: 20 });
-        } else {
-            // For other pages (user profiles, posts, etc.) we intentionally leave the state minimal —
-            // other sagas/components will request specific data (getContent, fetchData) as needed.
-            discussions = [];
         }
 
         if (discussions && discussions.length) {
@@ -162,10 +119,8 @@ export function* fetchState(location_change_action) {
             }
         }
 
-        // Safely dispatch the receiveState action if present
         yield safePutReceiveState(state);
 
-        // Safely run special-posts sync (now guarded inside)
         yield call(syncSpecialPosts);
     } catch (error) {
         console.error('~~ Saga fetchState error ~~>', url, error);
@@ -176,19 +131,13 @@ export function* fetchState(location_change_action) {
 }
 
 function* syncSpecialPosts() {
-    // Bail if we're rendering serverside since there is no localStorage
     if (!process.env.BROWSER) return null;
 
-    // Get special posts from the store.
     const specialPosts = yield select((state) =>
         state.offchain ? state.offchain.get('special_posts') : null
     );
-    if (!specialPosts) {
-        // Nothing to sync, exit quietly.
-        return null;
-    }
+    if (!specialPosts) return null;
 
-    // Mark seen featured posts.
     const seenFeaturedPosts = specialPosts.get('featured_posts').map((post) => {
         const id = `${post.get('author')}/${post.get('permlink')}`;
         return post.set(
@@ -197,7 +146,6 @@ function* syncSpecialPosts() {
         );
     });
 
-    // Mark seen promoted posts.
     const seenPromotedPosts = specialPosts.get('promoted_posts').map((post) => {
         const id = `${post.get('author')}/${post.get('permlink')}`;
         return post.set(
@@ -206,7 +154,6 @@ function* syncSpecialPosts() {
         );
     });
 
-    // --- PATCH: only dispatch if the action creator exists
     if (globalActions && typeof globalActions.syncSpecialPosts === 'function') {
         yield put(
             globalActions.syncSpecialPosts({
@@ -215,23 +162,21 @@ function* syncSpecialPosts() {
             })
         );
     } else {
-        // Soft fail: just log and continue
         console.warn('globalActions.syncSpecialPosts is not available; skipping dispatch.');
     }
-    // ---
 
-    // Mark all featured posts as seen.
     specialPosts.get('featured_posts').forEach((post) => {
         const id = `${post.get('author')}/${post.get('permlink')}`;
         localStorage.setItem(`featured-post-seen:${id}`, 'true');
     });
 
-    // Mark all promoted posts as seen.
     specialPosts.get('promoted_posts').forEach((post) => {
         const id = `${post.get('author')}/${post.get('permlink')}`;
         localStorage.setItem(`promoted-post-seen:${id}`, 'true');
     });
 }
+
+// Remaining saga functions (getAccounts, getAccountNotifications, fetchData, fetchJson) remain unchanged
 
 /**
  * Request account data for a set of usernames.

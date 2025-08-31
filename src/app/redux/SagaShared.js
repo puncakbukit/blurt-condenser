@@ -31,7 +31,6 @@ export function* getAccount(username, force = false) {
         state.global.get('accounts').get(username)
     );
 
-    // hive never serves `owner` prop (among others)
     const isLite = !!account && !account.get('owner');
 
     if (!account || force || isLite) {
@@ -52,7 +51,8 @@ export function* getAccount(username, force = false) {
     }
     return account;
 }
-// Patch start
+
+// --- PATCH: safe wrapper for receiveState ---
 function safePutReceiveState(state) {
     if (globalActions && typeof globalActions.receiveState === 'function') {
         return put(globalActions.receiveState(state));
@@ -61,12 +61,12 @@ function safePutReceiveState(state) {
         return null; // no-op
     }
 }
-// Patch end
+// ----------------------------
 
-/** Manual refreshes.  The router is in FetchDataSaga. */
+/** Manual refreshes. The router is in FetchDataSaga. */
 export function* getState({ payload: { url } }) {
     try {
-        // Instead of calling broken get_state, build a minimal state
+        // Minimal state builder
         let state = {
             content: {},
             accounts: {},
@@ -75,14 +75,15 @@ export function* getState({ payload: { url } }) {
 
         // Normalize the url
         url = url.split('?')[0].replace(/^\/+|\/+$/g, '');
-        if (url === '') url = 'hot';
+        let page = url;
+        if (url === '') page = 'hot';
 
         let discussions = [];
-        if (url.startsWith('trending') || url === 'trending') {
+        if (page.startsWith('trending') || page === 'trending') {
             discussions = yield call([api, api.getDiscussionsByTrendingAsync], { tag: '', limit: 20 });
-        } else if (url.startsWith('hot') || url === 'hot') {
+        } else if (page.startsWith('hot') || page === 'hot') {
             discussions = yield call([api, api.getDiscussionsByHotAsync], { tag: '', limit: 20 });
-        } else if (url.startsWith('created') || url === 'created') {
+        } else if (page.startsWith('created') || page === 'created') {
             discussions = yield call([api, api.getDiscussionsByCreatedAsync], { tag: '', limit: 20 });
         }
 
@@ -104,9 +105,7 @@ export function* getState({ payload: { url } }) {
 function* showTransactionErrorNotification() {
     const errors = yield select((state) => state.transaction.get('errors'));
     for (const [key, message] of errors) {
-        // Do not display a notification for the bandwidthError/transactionFeeError key.
-        if (key === 'bandwidthError' || key === 'transactionFeeError') {
-        } else {
+        if (key !== 'bandwidthError' && key !== 'transactionFeeError') {
             yield put(appActions.addNotification({ key, message }));
             yield put(transactionActions.deleteError({ key }));
         }
@@ -114,29 +113,28 @@ function* showTransactionErrorNotification() {
 }
 
 export function* getContent({ author, permlink, resolve, reject }) {
+    // Skip invalid posts (like homepage or .html files)
+    if (!author || !permlink || permlink.endsWith('.html')) {
+        console.warn('Skipping getContent for non-post', { author, permlink });
+        if (reject) reject();
+        return;
+    }
+
     let content;
     while (!content) {
         content = yield call([api, api.getContentAsync], author, permlink);
-        if (content.author == '') {
-            // retry if content not found. #1870
+        if (!content || content.author === '') {
+            // retry if content not found
             content = null;
             yield call(wait, 3000);
         }
     }
 
     yield put(globalActions.receiveContent({ content }));
-    if (resolve && content) {
-        resolve(content);
-    } else if (reject && !content) {
-        reject();
-    }
+    if (resolve && content) resolve(content);
+    else if (reject && !content) reject();
 }
 
-/**
- * Save this user's preferences, either directly from the submitted payload or from whatever's saved in the store currently.
- *
- * @param {Object?} params.payload
- */
 function* saveUserPreferences({ payload }) {
     if (payload) {
         yield setUserPreferences(payload);
@@ -145,3 +143,4 @@ function* saveUserPreferences({ payload }) {
     const prefs = yield select((state) => state.app.get('user_preferences'));
     yield setUserPreferences(prefs.toJS());
 }
+
