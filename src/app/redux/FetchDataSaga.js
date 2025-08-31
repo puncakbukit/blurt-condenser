@@ -13,8 +13,10 @@ import * as globalActions from './GlobalReducer';
 import * as appActions from './AppReducer';
 import constants from './constants';
 import { fromJS, Map, Set } from 'immutable';
-import { getStateAsync, callNotificationsApi } from 'app/utils/steemApi';
-// --- PATCH: safe wrapper ---
+// NOTE: removed getStateAsync (was unused)
+import { callNotificationsApi } from 'app/utils/steemApi';
+
+// --- PATCH: safe wrapper for receiveState ---
 function safePutReceiveState(state) {
     if (globalActions && typeof globalActions.receiveState === 'function') {
         return put(globalActions.receiveState(state));
@@ -24,6 +26,7 @@ function safePutReceiveState(state) {
     }
 }
 // ----------------------------
+
 const REQUEST_DATA = 'fetchDataSaga/REQUEST_DATA';
 const GET_CONTENT = 'fetchDataSaga/GET_CONTENT';
 const FETCH_STATE = 'fetchDataSaga/FETCH_STATE';
@@ -73,14 +76,14 @@ export function* fetchState(location_change_action) {
 
     yield put(appActions.fetchDataBegin());
     try {
-        // Fallback instead of getStateAsync
+        // Client-side fallback initial state builder (no getStateAsync)
         let state = {
             content: {},
             accounts: {},
             discussion_idx: {},
         };
 
-        // Normalize url
+        // Normalize url to a page key
         let page = url.split('?')[0].replace(/^\/+|\/+$/g, '');
         if (page === '') page = 'hot';
 
@@ -101,9 +104,10 @@ export function* fetchState(location_change_action) {
             }
         }
 
-        // --- PATCH: safe wrapper ---
+        // Safely dispatch the receiveState action if present
         yield safePutReceiveState(state);
-        // ---------------------------- 
+
+        // Safely run special-posts sync (now guarded inside)
         yield call(syncSpecialPosts);
     } catch (error) {
         console.error('~~ Saga fetchState error ~~>', url, error);
@@ -121,7 +125,11 @@ function* syncSpecialPosts() {
     const specialPosts = yield select((state) =>
         state.offchain ? state.offchain.get('special_posts') : null
     );
-    if (!specialPosts) return null;
+    if (!specialPosts) {
+        // Nothing to sync, exit quietly.
+        return null;
+    }
+
     // Mark seen featured posts.
     const seenFeaturedPosts = specialPosts.get('featured_posts').map((post) => {
         const id = `${post.get('author')}/${post.get('permlink')}`;
@@ -140,13 +148,19 @@ function* syncSpecialPosts() {
         );
     });
 
-    // Look up seen post URLs.
-    yield put(
-        globalActions.syncSpecialPosts({
-            featuredPosts: seenFeaturedPosts,
-            promotedPosts: seenPromotedPosts,
-        })
-    );
+    // --- PATCH: only dispatch if the action creator exists
+    if (globalActions && typeof globalActions.syncSpecialPosts === 'function') {
+        yield put(
+            globalActions.syncSpecialPosts({
+                featuredPosts: seenFeaturedPosts,
+                promotedPosts: seenPromotedPosts,
+            })
+        );
+    } else {
+        // Soft fail: just log and continue
+        console.warn('globalActions.syncSpecialPosts is not available; skipping dispatch.');
+    }
+    // ---
 
     // Mark all featured posts as seen.
     specialPosts.get('featured_posts').forEach((post) => {
@@ -450,3 +464,4 @@ export const actions = {
         payload,
     }),
 };
+
