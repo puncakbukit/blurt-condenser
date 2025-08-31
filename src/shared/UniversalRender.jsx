@@ -25,7 +25,14 @@ const SCROLL_DIRECTION_DOWN = 'down';
 const DISABLE_ROUTER_HISTORY_NAV_DIRECTION_EL_ID = 'disable_router_nav_history_direction_check';
 
 let scrollTopTimeout = null;
-
+// --- at the very top of UniversalRender.jsx ---
+if (!window.offchain) window.offchain = {};
+if (typeof window.offchain.syncSpecialPosts !== 'function') {
+    window.offchain.syncSpecialPosts = () => {
+        console.warn('syncSpecialPosts stub called - no-op');
+    };
+}
+ 
 const calcOffsetRoot = (startEl) => {
     let offset = 0, el = startEl;
     while (el) {
