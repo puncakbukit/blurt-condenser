@@ -57,7 +57,10 @@ function safePutReceiveState(state) {
     if (globalActions && typeof globalActions.receiveState === 'function') {
         return put(globalActions.receiveState(state));
     } else {
-        console.warn('globalActions.receiveState is missing or not a function', globalActions);
+        console.warn(
+            'globalActions.receiveState is missing or not a function',
+            globalActions
+        );
         return null; // no-op
     }
 }
@@ -80,11 +83,20 @@ export function* getState({ payload: { url } }) {
 
         let discussions = [];
         if (page.startsWith('trending') || page === 'trending') {
-            discussions = yield call([api, api.getDiscussionsByTrendingAsync], { tag: '', limit: 20 });
+            discussions = yield call(
+                [api, api.getDiscussionsByTrendingAsync],
+                { tag: '', limit: 20 }
+            );
         } else if (page.startsWith('hot') || page === 'hot') {
-            discussions = yield call([api, api.getDiscussionsByHotAsync], { tag: '', limit: 20 });
+            discussions = yield call(
+                [api, api.getDiscussionsByHotAsync],
+                { tag: '', limit: 20 }
+            );
         } else if (page.startsWith('created') || page === 'created') {
-            discussions = yield call([api, api.getDiscussionsByCreatedAsync], { tag: '', limit: 20 });
+            discussions = yield call(
+                [api, api.getDiscussionsByCreatedAsync],
+                { tag: '', limit: 20 }
+            );
         }
 
         // Fill state.content + index with posts
@@ -92,7 +104,9 @@ export function* getState({ payload: { url } }) {
             state.discussion_idx[page] = { '': [] };
             for (let d of discussions) {
                 state.content[`${d.author}/${d.permlink}`] = d;
-                state.discussion_idx[page][''].push(`${d.author}/${d.permlink}`);
+                state.discussion_idx[page][''].push(
+                    `${d.author}/${d.permlink}`
+                );
             }
         }
         yield safePutReceiveState(state);
@@ -112,28 +126,37 @@ function* showTransactionErrorNotification() {
     }
 }
 
+// --- PATCHED getContent: skip invalid fetches and no retry loop ---
 export function* getContent({ author, permlink, resolve, reject }) {
-    // Skip invalid posts (like homepage or .html files)
-    if (!author || !permlink || permlink.endsWith('.html')) {
-        console.warn('Skipping getContent for non-post', { author, permlink });
-        if (reject) reject();
-        return;
-    }
-
-    let content;
-    while (!content) {
-        content = yield call([api, api.getContentAsync], author, permlink);
-        if (!content || content.author === '') {
-            // retry if content not found
-            content = null;
-            yield call(wait, 3000);
+    try {
+        // Skip invalid posts (like homepage or .html files)
+        if (!author || !permlink || permlink.endsWith('.html')) {
+            console.warn('Skipping getContent for non-post', {
+                author,
+                permlink,
+            });
+            if (reject) reject();
+            return;
         }
-    }
 
-    yield put(globalActions.receiveContent({ content }));
-    if (resolve && content) resolve(content);
-    else if (reject && !content) reject();
+        const content = yield call([api, api.getContentAsync], author, permlink);
+
+        if (content && content.author) {
+            yield put(globalActions.receiveContent({ content }));
+            if (resolve) resolve(content);
+        } else {
+            console.warn('getContent: no content found', {
+                author,
+                permlink,
+            });
+            if (reject) reject();
+        }
+    } catch (error) {
+        console.error('~~ Saga getContent error ~~>', error);
+        if (reject) reject(error);
+    }
 }
+// ----------------------------
 
 function* saveUserPreferences({ payload }) {
     if (payload) {
