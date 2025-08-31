@@ -25,14 +25,13 @@ const SCROLL_DIRECTION_DOWN = 'down';
 const DISABLE_ROUTER_HISTORY_NAV_DIRECTION_EL_ID = 'disable_router_nav_history_direction_check';
 
 let scrollTopTimeout = null;
-// --- at the very top of UniversalRender.jsx ---
+
+// --- Stub offchain to prevent saga errors ---
 if (!window.offchain) window.offchain = {};
 if (typeof window.offchain.syncSpecialPosts !== 'function') {
-    window.offchain.syncSpecialPosts = () => {
-        console.warn('syncSpecialPosts stub called - no-op');
-    };
+    window.offchain.syncSpecialPosts = () => console.warn('syncSpecialPosts stub called - no-op');
 }
- 
+
 const calcOffsetRoot = (startEl) => {
     let offset = 0, el = startEl;
     while (el) {
@@ -114,7 +113,6 @@ async function fetchInitialState() {
     const content = {};
     const accounts = {};
 
-    // If path looks like /author/permlink
     if (parts.length === 2) {
         const [author, permlink] = parts;
         try {
@@ -133,17 +131,15 @@ async function fetchInitialState() {
         app: {},
         global: { content, accounts },
         offchain: {
-           special_posts: { featured_posts: [], promoted_posts: [] },
-           // stub to prevent client-side error
-           syncSpecialPosts: () => {}, 
+            special_posts: { featured_posts: [], promoted_posts: [] },
+            syncSpecialPosts: () => {}, // stub to prevent errors
         },
     };
 }
 
+// --- Client-side render ---
 export async function clientRender() {
     const sagaMiddleware = createSagaMiddleware();
-
-    // Populate store with live content/accounts
     const initialState = await fetchInitialState();
     const store = createStore(rootReducer, initialState, bindMiddleware([sagaMiddleware]));
     sagaMiddleware.run(rootSaga);
