@@ -44,11 +44,11 @@ export const fetchDataWatches = [
     takeEvery(GET_ACCOUNT_UNREAD_NOTIFICATIONS, getAccountUnreadNotifications),
 ];
 
+// --- PATCH: skip bogus content fetches (index.html etc.) ---
 export function* getContentCaller(action) {
     const { author, permlink } = action.payload;
-    // PATCH: skip .html or invalid content requests
     if (!author || !permlink || permlink.endsWith('.html')) {
-        console.warn('Skipping getContentCaller for non-post', { author, permlink });
+        console.warn('[Saga] Skipping getContentCaller for', { author, permlink });
         if (action.payload.reject) action.payload.reject();
         return;
     }
@@ -59,9 +59,9 @@ let is_initial_state = true;
 export function* fetchState(location_change_action) {
     const { pathname } = location_change_action.payload;
 
-    // PATCH: skip .html pages entirely
+    // --- PATCH: skip .html pages entirely ---
     if (pathname.endsWith('.html')) {
-        console.warn('Skipping fetchState for .html page:', pathname);
+        console.warn('[Saga] Skipping fetchState for .html page:', pathname);
         return;
     }
 
@@ -176,27 +176,13 @@ function* syncSpecialPosts() {
     });
 }
 
-// Remaining saga functions (getAccounts, getAccountNotifications, fetchData, fetchJson) remain unchanged
+// Remaining saga functions unchanged (getAccounts, notifications, fetchData, fetchJson)...
 
-/**
- * Request account data for a set of usernames.
- *
- * @todo batch the put()s
- *
- * @param {Iterable} usernames
- */
 function* getAccounts(usernames) {
     const accounts = yield call([api, api.getAccountsAsync], usernames);
     yield put(globalActions.receiveAccounts({ accounts }));
 }
 
-/**
- * Request notifications for given account
- * @param {object} payload containing:
- *   - account (string)
- *   - last_id (string), optional, for pagination
- *   - limit (int), optional, defualt is 100
- */
 export function* getAccountNotifications(action) {
     if (!action.payload) throw 'no account specified';
     try {
@@ -204,12 +190,8 @@ export function* getAccountNotifications(action) {
             callNotificationsApi,
             action.payload.account
         );
-
         if (notifications && notifications.error) {
-            console.error(
-                '~~ Saga getAccountNotifications error ~~>',
-                notifications.error
-            );
+            console.error('~~ Saga getAccountNotifications error ~~>', notifications.error);
             yield put(appActions.steemApiError(notifications.error.message));
         } else {
             yield put(
@@ -232,12 +214,8 @@ export function* getAccountUnreadNotifications(action) {
             callNotificationsApi,
             action.payload.account
         );
-
         if (notifications && notifications.error) {
-            console.error(
-                '~~ Saga getAccountUnreadNotifications error ~~>',
-                notifications.error
-            );
+            console.error('~~ Saga getAccountUnreadNotifications error ~~>', notifications.error);
             yield put(appActions.steemApiError(notifications.error.message));
         } else {
             yield put(
@@ -263,102 +241,39 @@ export function* fetchData(action) {
     let call_name, args;
     if (order === 'trending') {
         call_name = 'getDiscussionsByTrendingAsync';
-        args = [
-            {
-                tag: category,
-                limit: constants.FETCH_DATA_BATCH_SIZE,
-                start_author: author,
-                start_permlink: permlink,
-            },
-        ];
+        args = [{ tag: category, limit: constants.FETCH_DATA_BATCH_SIZE, start_author: author, start_permlink: permlink }];
     } else if (order === 'hot') {
         call_name = 'getDiscussionsByHotAsync';
-        args = [
-            {
-                tag: category,
-                limit: constants.FETCH_DATA_BATCH_SIZE,
-                start_author: author,
-                start_permlink: permlink,
-            },
-        ];
+        args = [{ tag: category, limit: constants.FETCH_DATA_BATCH_SIZE, start_author: author, start_permlink: permlink }];
     } else if (order === 'promoted') {
         call_name = 'getDiscussionsByPromotedAsync';
-        args = [
-            {
-                tag: category,
-                limit: constants.FETCH_DATA_BATCH_SIZE,
-                start_author: author,
-                start_permlink: permlink,
-            },
-        ];
+        args = [{ tag: category, limit: constants.FETCH_DATA_BATCH_SIZE, start_author: author, start_permlink: permlink }];
     } else if (order === 'payout') {
         call_name = 'getPostDiscussionsByPayoutAsync';
-        args = [
-            {
-                tag: category,
-                limit: constants.FETCH_DATA_BATCH_SIZE,
-                start_author: author,
-                start_permlink: permlink,
-            },
-        ];
+        args = [{ tag: category, limit: constants.FETCH_DATA_BATCH_SIZE, start_author: author, start_permlink: permlink }];
     } else if (order === 'payout_comments') {
         call_name = 'getCommentDiscussionsByPayoutAsync';
-        args = [
-            {
-                tag: category,
-                limit: constants.FETCH_DATA_BATCH_SIZE,
-                start_author: author,
-                start_permlink: permlink,
-            },
-        ];
+        args = [{ limit: constants.FETCH_DATA_BATCH_SIZE, start_author: author, start_permlink: permlink }];
     } else if (order === 'created') {
         call_name = 'getDiscussionsByCreatedAsync';
-        args = [
-            {
-                tag: category,
-                limit: constants.FETCH_DATA_BATCH_SIZE,
-                start_author: author,
-                start_permlink: permlink,
-            },
-        ];
+        args = [{ tag: category, limit: constants.FETCH_DATA_BATCH_SIZE, start_author: author, start_permlink: permlink }];
     } else if (order === 'by_replies') {
         call_name = 'getRepliesByLastUpdateAsync';
         args = [author, permlink, constants.FETCH_DATA_BATCH_SIZE];
     } else if (order === 'by_feed') {
-        // https://github.com/steemit/steem/issues/249
         call_name = 'getDiscussionsByFeedAsync';
-        args = [
-            {
-                tag: accountname,
-                limit: constants.FETCH_DATA_BATCH_SIZE,
-                start_author: author,
-                start_permlink: permlink,
-            },
-        ];
+        args = [{ tag: accountname, limit: constants.FETCH_DATA_BATCH_SIZE, start_author: author, start_permlink: permlink }];
     } else if (order === 'by_author') {
         call_name = 'getDiscussionsByBlogAsync';
-        args = [
-            {
-                tag: accountname,
-                limit: constants.FETCH_DATA_BATCH_SIZE,
-                start_author: author,
-                start_permlink: permlink,
-            },
-        ];
+        args = [{ tag: accountname, limit: constants.FETCH_DATA_BATCH_SIZE, start_author: author, start_permlink: permlink }];
     } else if (order === 'by_comments') {
         call_name = 'getDiscussionsByCommentsAsync';
-        args = [
-            {
-                limit: constants.FETCH_DATA_BATCH_SIZE,
-                start_author: author,
-                start_permlink: permlink,
-            },
-        ];
+        args = [{ limit: constants.FETCH_DATA_BATCH_SIZE, start_author: author, start_permlink: permlink }];
     } else {
-        // this should never happen. undefined behavior
         call_name = 'getDiscussionsByTrendingAsync';
         args = [{ limit: constants.FETCH_DATA_BATCH_SIZE }];
     }
+
     yield put(appActions.fetchDataBegin());
     try {
         const firstPermlink = permlink;
@@ -369,42 +284,23 @@ export function* fetchData(action) {
         let batch = 0;
         while (!fetchDone) {
             const data = yield call([api, api[call_name]], ...args);
-
             endOfData = data.length < constants.FETCH_DATA_BATCH_SIZE;
-
             batch++;
             fetchLimitReached = batch >= constants.MAX_BATCHES;
 
-            // next arg. Note 'by_replies' does not use same structure.
             const lastValue = data.length > 0 ? data[data.length - 1] : null;
             if (lastValue && order !== 'by_replies') {
                 args[0].start_author = lastValue.author;
                 args[0].start_permlink = lastValue.permlink;
             }
 
-            // Still return all data but only count ones matching the filter.
-            // Rely on UI to actually hide the posts.
-            fetched += postFilter
-                ? data.filter(postFilter).length
-                : data.length;
+            fetched += postFilter ? data.filter(postFilter).length : data.length;
+            fetchDone = endOfData || fetchLimitReached || fetched >= constants.FETCH_DATA_BATCH_SIZE;
 
-            fetchDone =
-                endOfData ||
-                fetchLimitReached ||
-                fetched >= constants.FETCH_DATA_BATCH_SIZE;
-
-            yield put(
-                globalActions.receiveData({
-                    data,
-                    order,
-                    category,
-                    author,
-                    firstPermlink,
-                    accountname,
-                    fetching: !fetchDone,
-                    endOfData,
-                })
-            );
+            yield put(globalActions.receiveData({
+                data, order, category, author, firstPermlink, accountname,
+                fetching: !fetchDone, endOfData,
+            }));
         }
     } catch (error) {
         console.error('~~ Saga fetchData error ~~>', call_name, args, error);
@@ -413,26 +309,14 @@ export function* fetchData(action) {
     yield put(appActions.fetchDataEnd());
 }
 
-/**
-    @arg {string} id unique key for result global['fetchJson_' + id]
-    @arg {string} url
-    @arg {object} body (for JSON.stringify)
-*/
-function* fetchJson({
-    payload: { id, url, body, successCallback, skipLoading = false },
-}) {
+function* fetchJson({ payload: { id, url, body, successCallback, skipLoading = false } }) {
     try {
         const payload = {
             method: body ? 'POST' : 'GET',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-            },
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
             body: body ? JSON.stringify(body) : undefined,
         };
-        let result = yield skipLoading
-            ? fetch(url, payload)
-            : call(fetch, url, payload);
+        let result = yield skipLoading ? fetch(url, payload) : call(fetch, url, payload);
         result = yield result.json();
         if (successCallback) result = successCallback(result);
         yield put(globalActions.fetchJsonResult({ id, result }));
@@ -444,27 +328,10 @@ function* fetchJson({
 
 // Action creators
 export const actions = {
-    requestData: (payload) => ({
-        type: REQUEST_DATA,
-        payload,
-    }),
-
-    getContent: (payload) => ({
-        type: GET_CONTENT,
-        payload,
-    }),
-
-    fetchState: (payload) => ({
-        type: FETCH_STATE,
-        payload,
-    }),
-    getAccountNotifications: (payload) => ({
-        type: GET_ACCOUNT_NOTIFICATIONS,
-        payload,
-    }),
-    getAccountUnreadNotifications: (payload) => ({
-        type: GET_ACCOUNT_UNREAD_NOTIFICATIONS,
-        payload,
-    }),
+    requestData: (payload) => ({ type: REQUEST_DATA, payload }),
+    getContent: (payload) => ({ type: GET_CONTENT, payload }),
+    fetchState: (payload) => ({ type: FETCH_STATE, payload }),
+    getAccountNotifications: (payload) => ({ type: GET_ACCOUNT_NOTIFICATIONS, payload }),
+    getAccountUnreadNotifications: (payload) => ({ type: GET_ACCOUNT_UNREAD_NOTIFICATIONS, payload }),
 };
 
