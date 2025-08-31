@@ -125,7 +125,11 @@ async function fetchInitialState() {
     return {
         app: {},
         global: { content, accounts },
-        offchain: { special_posts: { featured_posts: [], promoted_posts: [] } },
+        offchain: {
+           special_posts: { featured_posts: [], promoted_posts: [] },
+           // stub to prevent client-side error
+           syncSpecialPosts: () => {}, 
+        },
     };
 }
 
