@@ -13,8 +13,9 @@ import rootSaga from 'shared/RootSaga';
 import RootRoute from 'app/RootRoute';
 import Translator from 'app/Translator';
 import ScrollBehavior from 'scroll-behavior';
-import { getStateAsync } from 'app/utils/steemApi';
+import { api } from '@blurtfoundation/blurtjs';
 
+// --- Scroll constants ---
 const SCROLL_TOP_EXTRA_PIXEL_OFFSET = 3;
 const SCROLL_TOP_TRIES = 50;
 const SCROLL_TOP_DELAY_MS = 100;
@@ -26,8 +27,7 @@ const DISABLE_ROUTER_HISTORY_NAV_DIRECTION_EL_ID = 'disable_router_nav_history_d
 let scrollTopTimeout = null;
 
 const calcOffsetRoot = (startEl) => {
-    let offset = 0;
-    let el = startEl;
+    let offset = 0, el = startEl;
     while (el) {
         offset += el.offsetTop;
         el = el.offsetParent;
@@ -99,17 +99,41 @@ class OffsetScrollBehavior extends ScrollBehavior {
 
 const bindMiddleware = (middleware) => applyMiddleware(...middleware);
 
+// --- Client-side data fetch ---
+async function fetchInitialState() {
+    const path = window.location.pathname;
+    const parts = path.split('/').filter(Boolean);
+
+    const content = {};
+    const accounts = {};
+
+    // If path looks like /author/permlink
+    if (parts.length === 2) {
+        const [author, permlink] = parts;
+        try {
+            const post = await api.getContentAsync(author, permlink);
+            if (post && post.author) {
+                content[`${author}/${permlink}`] = post;
+                const accountData = await api.getAccountsAsync([author]);
+                if (accountData.length) accounts[author] = accountData[0];
+            }
+        } catch (err) {
+            console.error('Error fetching post or account:', err);
+        }
+    }
+
+    return {
+        app: {},
+        global: { content, accounts },
+        offchain: { special_posts: { featured_posts: [], promoted_posts: [] } },
+    };
+}
+
 export async function clientRender() {
     const sagaMiddleware = createSagaMiddleware();
 
-    // Fetch initial state from Blurt RPC
-    const offchain = await getStateAsync(window.location.pathname);
-    const initialState = {
-        app: {},
-        global: { content: {}, accounts: {} },
-        offchain,
-    };
-
+    // Populate store with live content/accounts
+    const initialState = await fetchInitialState();
     const store = createStore(rootReducer, initialState, bindMiddleware([sagaMiddleware]));
     sagaMiddleware.run(rootSaga);
 
