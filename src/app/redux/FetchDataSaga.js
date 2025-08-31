@@ -1,3 +1,4 @@
+// src/app/redux/FetchDataSaga.js
 import {
     call,
     put,
@@ -50,7 +51,53 @@ export function* getContentCaller(action) {
 
 let is_initial_state = true;
 export function* fetchState(location_change_action) {
-    const { pathname } = location_change_action.payload;
+    const { pathname: rawPathname } = location_change_action.payload;
+
+    // --- Normalize pathname for static / GitHub Pages hosts ---
+    // Convert things like:
+    //   /blurt-condenser/index.html  -> /
+    //   /blurt-condenser/            -> /
+    //   /index.html                  -> /
+    // Also strip any leading/trailing slashes to form page key below.
+    let pathname = rawPathname || '/';
+    try {
+        // Remove query/fragment if any (shouldn't be present here, but be defensive)
+        pathname = pathname.split('?')[0].split('#')[0];
+
+        // If the repo name is included as prefix (common on GitHub Pages),
+        // remove it. We attempt to read from <base href="..."> if available in browser,
+        // otherwise fall back to removing a common repo prefix like '/blurt-condenser'.
+        if (process.env.BROWSER && typeof document !== 'undefined') {
+            const base = document.querySelector('base');
+            if (base && base.getAttribute('href')) {
+                const baseHref = base.getAttribute('href');
+                if (baseHref !== '/' && pathname.startsWith(baseHref)) {
+                    pathname = pathname.substr(baseHref.length - (baseHref.endsWith('/') ? 1 : 0));
+                    if (!pathname.startsWith('/')) pathname = '/' + pathname;
+                }
+            } else {
+                // heuristic: remove common repo folder if present
+                const repoPrefixMatch = pathname.match(/^\/([a-z0-9\-_]+)(\/|$)/i);
+                // if match and path contains 'index.html' assume it's the repo file path -> strip first segment
+                if (repoPrefixMatch && pathname.endsWith('index.html')) {
+                    pathname = pathname.replace(/^\/[^/]+/, '') || '/';
+                }
+            }
+        } else {
+            // Non-browser (server) - also strip any trailing index.html to avoid server treating it like content.
+            if (pathname.endsWith('index.html')) pathname = pathname.replace(/index\.html$/, '');
+        }
+
+        // Final tiny normalization: collapse multiple slashes, ensure at least '/'
+        pathname = pathname.replace(/\/+/g, '/');
+        if (pathname === '' || pathname === '/') pathname = '/';
+    } catch (e) {
+        // On any unexpected error, fall back to rawPathname
+        pathname = rawPathname || '/';
+    }
+    // --- end normalization ---
+
+    // Extract username if route like /@username
     const m = pathname.match(/^\/@([a-z0-9\.-]+)/);
     if (m && m.length === 2) {
         const username = m[1];
@@ -91,7 +138,8 @@ export function* fetchState(location_change_action) {
 
         // Normalize url to a page key
         let page = url.split('?')[0].replace(/^\/+|\/+$/g, '');
-        if (page === '') page = 'hot';
+        // If page is something like 'index.html' or contains '.html' treat as home
+        if (page === '' || page === 'index.html' || /\.html$/i.test(page)) page = 'hot';
 
         let discussions = [];
         if (page.startsWith('trending') || page === 'trending') {
@@ -100,6 +148,10 @@ export function* fetchState(location_change_action) {
             discussions = yield call([api, api.getDiscussionsByHotAsync], { tag: '', limit: 20 });
         } else if (page.startsWith('created') || page === 'created') {
             discussions = yield call([api, api.getDiscussionsByCreatedAsync], { tag: '', limit: 20 });
+        } else {
+            // For other pages (user profiles, posts, etc.) we intentionally leave the state minimal —
+            // other sagas/components will request specific data (getContent, fetchData) as needed.
+            discussions = [];
         }
 
         if (discussions && discussions.length) {
