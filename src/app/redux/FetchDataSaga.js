@@ -62,7 +62,13 @@ export function* fetchState(location_change_action) {
     const server_location = yield select((state) =>
         state.offchain ? state.offchain.get('server_location') : null
     );
-    const ignore_fetch = pathname === server_location && is_initial_state;
+
+    // --- PATCH: Always fetch on pure client-side (SPA) builds ---
+    let ignore_fetch = false;
+    if (!process.env.BROWSER) {
+        // only skip on server-side render
+        ignore_fetch = pathname === server_location && is_initial_state;
+    }
 
     if (ignore_fetch) return;
     is_initial_state = false;
