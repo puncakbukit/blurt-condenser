@@ -125,16 +125,32 @@ function* showTransactionErrorNotification() {
         }
     }
 }
-
-// --- PATCHED getContent: skip invalid fetches and no retry loop ---
+// --- PATCHED getContent: skip invalid fetches and load feed for index ---
 export function* getContent({ author, permlink, resolve, reject }) {
     try {
-        // Skip invalid posts (like homepage or .html files)
+        // Special case: condenser bootstrap fake homepage
+        if (author === 'blurt-condenser' && permlink === 'index.html') {
+            console.warn('Intercepted bootstrap index.html fetch, loading created feed instead');
+            const discussions = yield call([api, api.getDiscussionsByCreatedAsync], { tag: '', limit: 20 });
+
+            if (discussions && discussions.length) {
+                let state = {
+                    content: {},
+                    discussion_idx: { created: { '': [] } },
+                };
+                for (let d of discussions) {
+                    state.content[`${d.author}/${d.permlink}`] = d;
+                    state.discussion_idx.created[''].push(`${d.author}/${d.permlink}`);
+                }
+                yield put(globalActions.receiveState(state));
+            }
+            if (resolve) resolve();
+            return;
+        }
+
+        // Skip obviously invalid posts
         if (!author || !permlink || permlink.endsWith('.html')) {
-            console.warn('Skipping getContent for non-post', {
-                author,
-                permlink,
-            });
+            console.warn('Skipping getContent for non-post', { author, permlink });
             if (reject) reject();
             return;
         }
@@ -145,10 +161,7 @@ export function* getContent({ author, permlink, resolve, reject }) {
             yield put(globalActions.receiveContent({ content }));
             if (resolve) resolve(content);
         } else {
-            console.warn('getContent: no content found', {
-                author,
-                permlink,
-            });
+            console.warn('getContent: no content found', { author, permlink });
             if (reject) reject();
         }
     } catch (error) {
@@ -156,7 +169,6 @@ export function* getContent({ author, permlink, resolve, reject }) {
         if (reject) reject(error);
     }
 }
-// ----------------------------
 
 function* saveUserPreferences({ payload }) {
     if (payload) {
