@@ -117,15 +117,16 @@ async function fetchInitialState() {
     try {
         if (parts.length === 0) {
             const discussions = await api.getDiscussionsByCreatedAsync({ tag: '', limit: 20 });
-            discussions.forEach((post) => {
+            for (const post of discussions) { // ✅ use for-of instead of forEach
                 const key = `${post.author}/${post.permlink}`;
                 content = content.set(key, fromJS(post));
                 discussion_idx = discussion_idx.updateIn(['created', ''], list => list.push(key));
+
                 if (!accounts.has(post.author)) {
-                    const [accountData] = await api.getAccountsAsync([post.author]);
+                    const [accountData] = await api.getAccountsAsync([post.author]); // ✅ await works here
                     if (accountData) accounts = accounts.set(post.author, fromJS(accountData));
                 }
-            });
+            }
         } else if (parts.length === 2) {
             const [author, permlink] = parts;
             const post = await api.getContentAsync(author, permlink);
