@@ -46,10 +46,11 @@ export const fetchDataWatches = [
 
 // --- PATCH: skip bogus content fetches (index.html etc.) ---
 export function* getContentCaller(action) {
-    const { author, permlink } = action.payload;
-    if (!author || !permlink || permlink.endsWith('.html')) {
-        console.warn('[Saga] Skipping getContentCaller for', { author, permlink });
-        if (action.payload.reject) action.payload.reject();
+    const { author, permlink } = action.payload || {};
+    // skip if params missing or when permlink looks like a file (index.html)
+    if (!author || !permlink || typeof permlink !== 'string' || permlink.endsWith('.html')) {
+        console.warn('[Saga] Skipping getContentCaller for non-post', { author, permlink });
+        if (action.payload && typeof action.payload.reject === 'function') action.payload.reject();
         return;
     }
     yield getContent(action.payload);
@@ -57,15 +58,28 @@ export function* getContentCaller(action) {
 
 let is_initial_state = true;
 export function* fetchState(location_change_action) {
-    const { pathname } = location_change_action.payload;
+    // defensive: ensure payload exists
+    if (!location_change_action || !location_change_action.payload) return;
 
-    // --- PATCH: skip .html pages entirely ---
-    if (pathname.endsWith('.html')) {
-        console.warn('[Saga] Skipping fetchState for .html page:', pathname);
+    let { pathname } = location_change_action.payload;
+
+    // normalize pathname to avoid cases like '/blurt-condenser/index.html'
+    // treat any path that ends with 'index.html' as root '/'
+    if (typeof pathname === 'string' && pathname.endsWith('index.html')) {
+        console.warn('[Saga] Normalizing index.html path to root:', pathname);
+        // strip the filename, leave the directory (or '/')
+        pathname = pathname.replace(/index\.html$/, '');
+        if (pathname === '' || pathname === '/' || pathname === null) pathname = '/';
+    }
+
+    // --- PATCH: skip requests where path ends with a .html file (we already normalized index.html)
+    if (typeof pathname === 'string' && pathname.match(/\.html$/)) {
+        console.warn('[Saga] Skipping fetchState for .html page (non-post)', pathname);
         return;
     }
 
-    const m = pathname.match(/^\/@([a-z0-9\.-]+)/);
+    // If the route is a user page (/@username/...) we may need follow counts
+    const m = typeof pathname === 'string' && pathname.match(/^\/@([a-z0-9\.-]+)/);
     if (m && m.length === 2) {
         const username = m[1];
         yield fork(fetchFollowCount, username);
@@ -99,7 +113,7 @@ export function* fetchState(location_change_action) {
             discussion_idx: {},
         };
 
-        let page = url.split('?')[0].replace(/^\/+|\/+$/g, '');
+        let page = (url || '').split('?')[0].replace(/^\/+|\/+$/g, '');
         if (page === '') page = 'hot';
 
         let discussions = [];
@@ -176,7 +190,7 @@ function* syncSpecialPosts() {
     });
 }
 
-// Remaining saga functions unchanged (getAccounts, notifications, fetchData, fetchJson)...
+// Remaining helper saga functions
 
 function* getAccounts(usernames) {
     const accounts = yield call([api, api.getAccountsAsync], usernames);
