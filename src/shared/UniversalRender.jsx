@@ -104,7 +104,6 @@ class OffsetScrollBehavior extends ScrollBehavior {
 }
 
 const bindMiddleware = (middleware) => applyMiddleware(...middleware);
-
 // --- Client-side data fetch ---
 async function fetchInitialState() {
     const path = window.location.pathname;
@@ -112,30 +111,30 @@ async function fetchInitialState() {
 
     const content = {};
     const accounts = {};
+    const discussion_idx = { created: { '': [] } };
 
     try {
-        if (parts.length === 2) {
-            // Case: /author/permlink -> fetch single post
-            const [author, permlink] = parts;
-            const post = await api.getContentAsync(author, permlink);
-            if (post && post.author) {
-                content[`${author}/${permlink}`] = post;
-                const accountData = await api.getAccountsAsync([author]);
-                if (accountData.length) accounts[author] = accountData[0];
-            }
-        } else {
-            // Case: homepage (/) or unknown -> fetch feed
-            const discussions = await api.getDiscussionsByCreatedAsync({
-                tag: '',   // empty = global feed
-                limit: 20, // number of posts to fetch
-            });
-
+        // Case 1: homepage -> load feed
+        if (parts.length === 0) {
+            const discussions = await api.getDiscussionsByCreatedAsync({ tag: '', limit: 20 });
             for (const post of discussions) {
                 content[`${post.author}/${post.permlink}`] = post;
+                discussion_idx.created[''].push(`${post.author}/${post.permlink}`);
+
                 if (!accounts[post.author]) {
                     const [accountData] = await api.getAccountsAsync([post.author]);
                     if (accountData) accounts[post.author] = accountData;
                 }
+            }
+        }
+        // Case 2: single post
+        else if (parts.length === 2) {
+            const [author, permlink] = parts;
+            const post = await api.getContentAsync(author, permlink);
+            if (post && post.author) {
+                content[`${author}/${permlink}`] = post;
+                const [accountData] = await api.getAccountsAsync([author]);
+                if (accountData) accounts[author] = accountData;
             }
         }
     } catch (err) {
@@ -144,10 +143,10 @@ async function fetchInitialState() {
 
     return {
         app: {},
-        global: { content, accounts },
+        global: { content, accounts, discussion_idx },
         offchain: {
             special_posts: { featured_posts: [], promoted_posts: [] },
-            syncSpecialPosts: () => {}, // stub to prevent errors
+            syncSpecialPosts: () => {},
         },
     };
 }

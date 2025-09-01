@@ -125,30 +125,16 @@ function* showTransactionErrorNotification() {
         }
     }
 }
-// --- PATCHED getContent: skip invalid fetches and load feed for index ---
+
 export function* getContent({ author, permlink, resolve, reject }) {
     try {
-        // Special case: condenser bootstrap fake homepage
+        // Ignore old bootstrap request for blurt-condenser/index.html
         if (author === 'blurt-condenser' && permlink === 'index.html') {
-            console.warn('Intercepted bootstrap index.html fetch, loading created feed instead');
-            const discussions = yield call([api, api.getDiscussionsByCreatedAsync], { tag: '', limit: 20 });
-
-            if (discussions && discussions.length) {
-                let state = {
-                    content: {},
-                    discussion_idx: { created: { '': [] } },
-                };
-                for (let d of discussions) {
-                    state.content[`${d.author}/${d.permlink}`] = d;
-                    state.discussion_idx.created[''].push(`${d.author}/${d.permlink}`);
-                }
-                yield put(globalActions.receiveState(state));
-            }
+            console.warn('Skipping old bootstrap fetch; feed already loaded');
             if (resolve) resolve();
             return;
         }
 
-        // Skip obviously invalid posts
         if (!author || !permlink || permlink.endsWith('.html')) {
             console.warn('Skipping getContent for non-post', { author, permlink });
             if (reject) reject();
@@ -156,7 +142,6 @@ export function* getContent({ author, permlink, resolve, reject }) {
         }
 
         const content = yield call([api, api.getContentAsync], author, permlink);
-
         if (content && content.author) {
             yield put(globalActions.receiveContent({ content }));
             if (resolve) resolve(content);
