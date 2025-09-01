@@ -113,18 +113,33 @@ async function fetchInitialState() {
     const content = {};
     const accounts = {};
 
-    if (parts.length === 2) {
-        const [author, permlink] = parts;
-        try {
+    try {
+        if (parts.length === 2) {
+            // Case: /author/permlink -> fetch single post
+            const [author, permlink] = parts;
             const post = await api.getContentAsync(author, permlink);
             if (post && post.author) {
                 content[`${author}/${permlink}`] = post;
                 const accountData = await api.getAccountsAsync([author]);
                 if (accountData.length) accounts[author] = accountData[0];
             }
-        } catch (err) {
-            console.error('Error fetching post or account:', err);
+        } else {
+            // Case: homepage (/) or unknown -> fetch feed
+            const discussions = await api.getDiscussionsByCreatedAsync({
+                tag: '',   // empty = global feed
+                limit: 20, // number of posts to fetch
+            });
+
+            for (const post of discussions) {
+                content[`${post.author}/${post.permlink}`] = post;
+                if (!accounts[post.author]) {
+                    const [accountData] = await api.getAccountsAsync([post.author]);
+                    if (accountData) accounts[post.author] = accountData;
+                }
+            }
         }
+    } catch (err) {
+        console.error('Error fetching initial state:', err);
     }
 
     return {
