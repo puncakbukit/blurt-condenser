@@ -1,5 +1,6 @@
 /* eslint react/prop-types: 0 */
 import React from 'react';
+import { reduxForm } from 'redux-form';
 import tt from 'counterpart';
 import { Link } from 'react-router';
 
