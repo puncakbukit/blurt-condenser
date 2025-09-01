@@ -104,7 +104,9 @@ class OffsetScrollBehavior extends ScrollBehavior {
 }
 
 const bindMiddleware = (middleware) => applyMiddleware(...middleware);
-import { fromJS, List, Map } from 'immutable';
+
+import { fromJS, Map } from 'immutable';
+import { api } from '@blurtfoundation/blurtjs';
 
 async function fetchInitialState() {
     const path = window.location.pathname;
@@ -116,14 +118,15 @@ async function fetchInitialState() {
 
     try {
         if (parts.length === 0) {
-            const discussions = await api.getDiscussionsByCreatedAsync({ tag: '', limit: 20 });
-            for (const post of discussions) { // ✅ use for-of instead of forEach
+            // Root SPA page: fetch 15 latest posts
+            const discussions = await api.getDiscussionsByCreatedAsync({ tag: '', limit: 15 });
+            for (const post of discussions) {
                 const key = `${post.author}/${post.permlink}`;
                 content = content.set(key, fromJS(post));
                 discussion_idx = discussion_idx.updateIn(['created', ''], list => list.push(key));
 
                 if (!accounts.has(post.author)) {
-                    const [accountData] = await api.getAccountsAsync([post.author]); // ✅ await works here
+                    const [accountData] = await api.getAccountsAsync([post.author]);
                     if (accountData) accounts = accounts.set(post.author, fromJS(accountData));
                 }
             }
