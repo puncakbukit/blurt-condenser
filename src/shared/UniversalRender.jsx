@@ -106,7 +106,6 @@ class OffsetScrollBehavior extends ScrollBehavior {
 const bindMiddleware = (middleware) => applyMiddleware(...middleware);
 
 import { fromJS, Map } from 'immutable';
-import { api } from '@blurtfoundation/blurtjs';
 
 async function fetchInitialState() {
     const path = window.location.pathname;
