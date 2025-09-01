@@ -1,7 +1,7 @@
 // src/app/components/pages/FeedPage.jsx
 import React from 'react';
 import { connect } from 'react-redux';
-import PostSummary from './PostSummary'; // reuse condenser's PostSummary component
+import PostSummary from '../cards/PostSummary';
 
 const FeedPage = ({ content, discussionIdx }) => {
     if (!discussionIdx || !discussionIdx.created || !discussionIdx.created['']) {
