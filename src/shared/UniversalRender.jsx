@@ -104,60 +104,54 @@ class OffsetScrollBehavior extends ScrollBehavior {
 }
 
 const bindMiddleware = (middleware) => applyMiddleware(...middleware);
+import { fromJS, List, Map } from 'immutable';
 
-// --- Client-side data fetch ---
 async function fetchInitialState() {
     const path = window.location.pathname;
     const parts = path.split('/').filter(Boolean);
 
-    const content = {};
-    const accounts = {};
-    const discussion_idx = { created: { '': [] } };
+    let content = Map();
+    let accounts = Map();
+    let discussion_idx = fromJS({ created: { '': [] } });
 
     try {
         if (parts.length === 0) {
-            // Homepage feed
             const discussions = await api.getDiscussionsByCreatedAsync({ tag: '', limit: 20 });
-            for (const post of discussions) {
-                content[`${post.author}/${post.permlink}`] = post;
-                discussion_idx.created[''].push(`${post.author}/${post.permlink}`);
-
-                if (!accounts[post.author]) {
+            discussions.forEach((post) => {
+                const key = `${post.author}/${post.permlink}`;
+                content = content.set(key, fromJS(post));
+                discussion_idx = discussion_idx.updateIn(['created', ''], list => list.push(key));
+                if (!accounts.has(post.author)) {
                     const [accountData] = await api.getAccountsAsync([post.author]);
-                    if (accountData) accounts[post.author] = accountData;
+                    if (accountData) accounts = accounts.set(post.author, fromJS(accountData));
                 }
-            }
+            });
         } else if (parts.length === 2) {
-            // Single post page
             const [author, permlink] = parts;
             const post = await api.getContentAsync(author, permlink);
             if (post && post.author) {
-                content[`${author}/${permlink}`] = post;
+                const key = `${author}/${permlink}`;
+                content = content.set(key, fromJS(post));
                 const [accountData] = await api.getAccountsAsync([author]);
-                if (accountData) accounts[author] = accountData;
+                if (accountData) accounts = accounts.set(author, fromJS(accountData));
             }
-        } else {
-            console.warn('Unknown path, skipping content fetch:', path);
         }
     } catch (err) {
         console.error('Error fetching initial state:', err);
     }
 
-    return {
+    return fromJS({
         app: {},
         global: { content, accounts, discussion_idx },
-        offchain: {
-            special_posts: { featured_posts: [], promoted_posts: [] },
-            syncSpecialPosts: () => {},
-        },
-    };
+        offchain: { special_posts: { featured_posts: [], promoted_posts: [] }, syncSpecialPosts: () => {} },
+    });
 }
 
 // --- Client-side render ---
 export async function clientRender() {
     const sagaMiddleware = createSagaMiddleware();
     const initialState = await fetchInitialState();
-    const store = createStore(rootReducer, initialState, bindMiddleware([sagaMiddleware]));
+    const store = createStore(rootReducer, initialState, applyMiddleware(sagaMiddleware));
     sagaMiddleware.run(rootSaga);
 
     const history = syncHistoryWithStore(browserHistory, store);
