@@ -104,6 +104,7 @@ class OffsetScrollBehavior extends ScrollBehavior {
 }
 
 const bindMiddleware = (middleware) => applyMiddleware(...middleware);
+
 // --- Client-side data fetch ---
 async function fetchInitialState() {
     const path = window.location.pathname;
@@ -114,8 +115,8 @@ async function fetchInitialState() {
     const discussion_idx = { created: { '': [] } };
 
     try {
-        // Case 1: homepage -> load feed
         if (parts.length === 0) {
+            // Homepage feed
             const discussions = await api.getDiscussionsByCreatedAsync({ tag: '', limit: 20 });
             for (const post of discussions) {
                 content[`${post.author}/${post.permlink}`] = post;
@@ -126,9 +127,8 @@ async function fetchInitialState() {
                     if (accountData) accounts[post.author] = accountData;
                 }
             }
-        }
-        // Case 2: single post
-        else if (parts.length === 2) {
+        } else if (parts.length === 2) {
+            // Single post page
             const [author, permlink] = parts;
             const post = await api.getContentAsync(author, permlink);
             if (post && post.author) {
@@ -136,6 +136,8 @@ async function fetchInitialState() {
                 const [accountData] = await api.getAccountsAsync([author]);
                 if (accountData) accounts[author] = accountData;
             }
+        } else {
+            console.warn('Unknown path, skipping content fetch:', path);
         }
     } catch (err) {
         console.error('Error fetching initial state:', err);
