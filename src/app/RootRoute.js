@@ -57,9 +57,6 @@ if (typeof require.ensure !== 'function') require.ensure = (d, c) => c(require);
             case 'PostsIndex':
                 cb(null, [FeedPage]);
                 break;
-            case 'IndexHtml': // explicit handling so /index.html is feed, not post
-                cb(null, [FeedPage]);
-                break;
              default:
                  cb(process.env.BROWSER ? null : Error(404), [NotFound]);
          }

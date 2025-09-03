@@ -14,7 +14,8 @@ export const routeRegex = {
 };
 
 export default function resolveRoute(path) {
-    if (path === '/') {
+    if (path === '/' || path === '/index.html') {
+        // Always map root and /index.html to feed
         return { page: 'PostsIndex', params: ['hot'] };
     }
     if (path === '/about.html') {
